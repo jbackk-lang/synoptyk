@@ -1,3 +1,4 @@
+import sys
 import unittest
 from unittest.mock import patch
 
@@ -40,7 +41,7 @@ class SynoptykTests(unittest.TestCase):
 
     def test_main_returns_non_zero_on_error(self):
         with patch("synoptyk.get_forecast", side_effect=ValueError("x")):
-            with patch("sys.argv", ["synoptyk.py", "Warszawa"]):
+            with patch.object(sys, "argv", ["synoptyk.py", "Warszawa"]):
                 self.assertEqual(1, synoptyk.main())
 
 
