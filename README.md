@@ -114,6 +114,25 @@ Oznacza to:
 - możesz modyfikować, kopiować i rozpowszechniać,
 - musisz zachować informację o autorze i licencji w kopii kodu.
 
+## Uwaga końcowa
+synoptyk jest projektem otwartym i modularnym.  
+Rdzeń (TIMDR + Λ–τ–ρ + świece) jest kompletny i stabilny —  
+wszystko, co powstanie dalej, to już przestrzeń do eksperymentów, modyfikacji i zabawy dla społeczności.
+
+Każdy może:
+- dodawać własne rozszerzenia,
+- tworzyć nowe moduły analizy,
+- poprawiać algorytmy,
+- rozwijać scoring,
+- budować wizualizacje,
+- albo po prostu korzystać z gotowego silnika.
+
+synoptyk nie jest klasycznym modelem numerycznym.  
+To narzędzie do analizy sygnałów pogodowych — lekkie, szybkie i zrozumiałe.  
+Jeśli ktoś chce je rozwijać, droga wolna.  
+Jeśli ktoś chce się nim bawić — jeszcze lepiej.
+
+
 Pełna treść licencji MIT:
 
 MIT License
