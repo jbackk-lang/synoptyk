@@ -11,8 +11,13 @@ from urllib.error import URLError
 
 
 def _fetch_json(url: str) -> dict:
-    with urllib.request.urlopen(url, timeout=10) as response:
-        return json.load(response)
+    try:
+        with urllib.request.urlopen(url, timeout=10) as response:
+            return json.load(response)
+    except URLError as exc:
+        raise URLError("Nie udało się połączyć z usługą pogodową") from exc
+    except json.JSONDecodeError as exc:
+        raise ValueError("Nieprawidłowa odpowiedź z usługi pogodowej") from exc
 
 
 def _geocode_city(city: str) -> tuple[float, float]:
@@ -22,7 +27,10 @@ def _geocode_city(city: str) -> tuple[float, float]:
     if not results:
         raise ValueError(f"Nie znaleziono miasta: {city}")
     first = results[0]
-    return float(first["latitude"]), float(first["longitude"])
+    try:
+        return float(first["latitude"]), float(first["longitude"])
+    except (KeyError, TypeError, ValueError) as exc:
+        raise ValueError("Nieprawidłowe dane lokalizacji miasta") from exc
 
 
 def get_forecast(city: str) -> str:
@@ -37,11 +45,14 @@ def get_forecast(city: str) -> str:
         }
     )
     payload = _fetch_json(f"https://api.open-meteo.com/v1/forecast?{query}")
-    daily = payload["daily"]
-    date = daily["time"][0]
-    temp_max = daily["temperature_2m_max"][0]
-    temp_min = daily["temperature_2m_min"][0]
-    rain = daily["precipitation_probability_max"][0]
+    try:
+        daily = payload["daily"]
+        date = daily["time"][0]
+        temp_max = daily["temperature_2m_max"][0]
+        temp_min = daily["temperature_2m_min"][0]
+        rain = daily["precipitation_probability_max"][0]
+    except (KeyError, IndexError, TypeError) as exc:
+        raise ValueError("Nieprawidłowa odpowiedź prognozy pogody") from exc
     return (
         f"Prognoza pogody dla {city} ({date}): "
         f"min {temp_min}°C, max {temp_max}°C, opady {rain}%."
