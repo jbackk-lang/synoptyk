@@ -179,6 +179,15 @@ def j_compress(data):
     std = variance**0.5
     return mean, std
 
+Copyright (c) 2026 Jacek Kielich
+
+All rights reserved.
+
+This software is proprietary and confidential. 
+No part of this code, documentation, or associated files may be copied, 
+modified, distributed, sold, or used without explicit written permission 
+from the author.
+
 
 Pełna treść licencji MIT:
 
