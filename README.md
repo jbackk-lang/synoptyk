@@ -1,4 +1,5 @@
-# SYNOPTYK  
+## Dokumentacja online
+https://jbackk-lang.github.io/# SYNOPTYK  
 TIMDR + Λ–τ–ρ na danych synoptycznych IMGW
 
 ## Opis
