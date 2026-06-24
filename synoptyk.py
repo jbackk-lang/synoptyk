@@ -264,15 +264,4 @@ if __name__ == "__main__":
     csv_path = "balice_30dni.csv"
     run_synoptyk(csv_path)
 
-from extensions.scoring import score_30_days
-
-# scoring 30 dni
-print("\n=== SCORING 30 DNI ===")
-score = score_30_days(df)
-print("Fronty:", f"{score.fronty:.1f}%")
-print("Opady:", f"{score.opady:.1f}%")
-print("Temperatura:", f"{score.temperatura:.1f}%")
-print("Wiatr:", f"{score.wiatr:.1f}%")
-print("Średnia:", f"{score.srednia:.1f}%")
-print("Szczegóły:", score.szczegoly)
 
