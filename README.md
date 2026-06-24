@@ -132,6 +132,53 @@ To narzędzie do analizy sygnałów pogodowych — lekkie, szybkie i zrozumiałe
 Jeśli ktoś chce je rozwijać, droga wolna.  
 Jeśli ktoś chce się nim bawić — jeszcze lepiej.
 
+# README — SYNOPTIC‑F (Model Prognozowania Strukturalnego)
+
+## Opis modelu
+SYNOPTIC‑F to model rzeczywistego prognozowania opartego na analizie struktury zjawisk atmosferycznych.  
+Model nie zgaduje i nie symuluje — prognozuje na podstawie danych wejściowych, wykorzystując stabilne cechy zjawiska (figurę), wyodrębnione z serii pomiarowej.
+
+Model działa niezależnie od klasycznego synoptyka 48/72 h.  
+SYNOPTIC‑F nie korzysta z dynamiki atmosfery, lecz z inwariantu strukturalnego, który pozostaje stabilny w czasie.
+
+## Zasada działania
+Model przetwarza dane w czterech krokach:
+
+1. Kompresja J — redukcja danych do parametrów opisujących rdzeń zjawiska.  
+2. Dekompresja J — odtworzenie struktury o tej samej długości co dane wejściowe.  
+3. Filtr Λ–τ–ρ — wydobycie figury zjawiska (struktury, transformacji i defektu).  
+4. Prognoza — figura staje się podstawą do przewidywania kolejnych wartości.
+
+## Kluczowa reguła modelu
+**Zasięg prognozy SYNOPTIC‑F jest równy długości okna danych wejściowych.**
+
+Przykłady:  
+- 7 dni danych → 7 dni prognozy  
+- 14 dni danych → 14 dni prognozy  
+- 30 dni danych → 30 dni prognozy  
+
+To jest prognoza, nie projekcja.  
+Model przewiduje przyszłość na podstawie struktury wyciągniętej z danych historycznych.
+
+## Dlaczego to działa
+Figura zjawiska jest stabilna, ponieważ reprezentuje rytm i kształt zmian, a nie ich chwilową dynamikę.  
+Dzięki temu model może prognozować tak daleko, jak daleko sięga analiza danych wejściowych.
+
+## Kod źródłowy
+
+### Kompresja J
+```python
+def j_compress(data):
+    """
+    Kompresja J — rdzeń danych:
+    - średnia
+    - odchylenie standardowe
+    """
+    mean = sum(data) / len(data)
+    variance = sum((x - mean)**2 for x in data) / len(data)
+    std = variance**0.5
+    return mean, std
+
 
 Pełna treść licencji MIT:
 
