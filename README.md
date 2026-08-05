@@ -1,5 +1,7 @@
 # 🌤️ synoptyk – Niespotykana analiza globalnej pogody
 
+WWW [https://github.com/jbackk-lang/jbackk-lang.github.io  ](https://jbackk-lang.github.io/)   
+
 **TIMDR + Λ–τ–ρ na danych synoptycznych IMGW**
 
 `synoptyk` to lekki, strukturalny analizator meteorologiczny. Nie oblicza fizyki atmosfery – analizuje **zmiany parametrów w czasie**, wychwytując odwrócenia trendu, anomalie, skoki, mikro-fronty i stabilizacje pogody. Projekt jest częścią ekosystemu **TIMDR** i łączy się z modelem prognostycznym **SYNOPTIC‑F**.
