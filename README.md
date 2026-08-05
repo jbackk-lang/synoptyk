@@ -1,214 +1,131 @@
-## Dokumentacja online
-https://jbackk-lang.github.io/# SYNOPTYK  
-TIMDR + Λ–τ–ρ na danych synoptycznych IMGW
+# 🌤️ synoptyk – Niespotykana analiza globalnej pogody
 
-## Opis
-synoptyk to lekki analizator meteorologiczny działający na danych godzinowych IMGW  
-(np. stacja Kraków–Balice).  
-Nie liczy fizyki atmosfery — analizuje zmiany parametrów w czasie.
+**TIMDR + Λ–τ–ρ na danych synoptycznych IMGW**
 
-Wykrywa:
-- odwrócenia trendu,
-- anomalie,
-- skoki,
-- mikro-fronty,
-- stabilizacje pogody.
+`synoptyk` to lekki, strukturalny analizator meteorologiczny. Nie oblicza fizyki atmosfery – analizuje **zmiany parametrów w czasie**, wychwytując odwrócenia trendu, anomalie, skoki, mikro-fronty i stabilizacje pogody. Projekt jest częścią ekosystemu **TIMDR** i łączy się z modelem prognostycznym **SYNOPTIC‑F**.
 
-## Świece (OHLC)
-Dane godzinowe są przekształcane w świece:
-- 1h – wilgotność (szybkie zmiany),
-- 4h – temperatura (cykle dobowe),
-- 12h – ciśnienie (fronty).
+---
 
-Świeca = open, high, low, close.
+## 🎯 Opis
 
-## Sygnały TIMDR (opis meteorologiczny)
+`synoptyk` działa na danych godzinowych (np. ze stacji Kraków–Balice) i przekształca je w sygnały opisujące dynamikę pogody.
 
-### Skręt (trend reversal)
-Zmiana kierunku zmian parametru:
-- ciśnienie spadało → zaczyna rosnąć,
-- temperatura rosła → zaczyna spadać.
+**Wykrywa:**
+- odwrócenia trendu (skręt)
+- anomalie
+- skoki (defekty)
+- mikro-fronty
+- stabilizacje pogody
 
-Meteorologicznie: przejście frontu, zmiana masy powietrza, zmiana kierunku wiatru.
+---
 
-### Anomalia (anomaly)
-Nagła zmiana wykraczająca poza normalne wahania:
-- szybki spadek temperatury,
-- skok ciśnienia po froncie,
-- wzrost wilgotności przed opadami.
+## 🕯️ Świece (OHLC)
 
-### Momentum (przyspieszenie zmian)
-Kumulacja zmian w krótkim czasie:
-- seria wzrostów temperatury → napływ cieplejszego powietrza,
-- seria spadków ciśnienia → zbliżający się front.
+Dane godzinowe są zagregowane w świece dla trzech warstw czasowych:
+- **1h** – wilgotność (szybkie zmiany)
+- **4h** – temperatura (cykle dobowe)
+- **12h** – ciśnienie (fronty atmosferyczne)
 
-### Defekt (defect)
-Skok, który nie pasuje do trendu:
-- wilgotność spada podczas burzy,
-- ciśnienie rośnie w środku frontu.
+Świeca = **open, high, low, close** dla każdego okna.
 
-Meteorologicznie: lokalne zaburzenie, nietypowe zjawisko.
+---
 
-### Rezonans (resonance)
-Zgodność kilku parametrów naraz:
-- spadek ciśnienia + wzrost wilgotności + zmiana wiatru → front,
-- wzrost temperatury + spadek wilgotności → napływ suchego, ciepłego powietrza.
+## 📡 Sygnały TIMDR
 
-## Warstwy Λ–τ–ρ (opis meteorologiczny)
+| Sygnał | Opis meteorologiczny |
+|--------|------------------------|
+| **Skręt (trend reversal)** | Zmiana kierunku zmian: ciśnienie spadało → zaczyna rosnąć, temperatura rosła → zaczyna spadać. Przejście frontu, zmiana masy powietrza. |
+| **Anomalia (anomaly)** | Nagła zmiana wykraczająca poza normalne wahania: szybki spadek temperatury, skok ciśnienia, wzrost wilgotności przed opadami. |
+| **Momentum** | Kumulacja zmian w krótkim czasie: seria wzrostów temperatury (napływ ciepła) lub spadków ciśnienia (zbliżający się front). |
+| **Defekt (defect)** | Skok, który nie pasuje do trendu: np. wilgotność spada podczas burzy, ciśnienie rośnie w środku frontu. Lokalne zaburzenie. |
+| **Rezonans (resonance)** | Zgodność kilku parametrów naraz: spadek ciśnienia + wzrost wilgotności + zmiana wiatru → front. |
 
-### Λ — struktura danych
-Kontrola jakości:
-- kompletność,
-- brak szumu,
-- stabilność pomiarów.
+---
 
-### τ — transformacja zmian
-Charakter zmian:
-- tempo spadku/ wzrostu ciśnienia,
-- amplituda temperatury,
-- dynamika wilgotności.
+## 🧱 Warstwy Λ–τ–ρ
 
-### ρ — defekt
-Wykrywanie nagłych skoków:
-- burze,
-- mikro-fronty,
-- lokalne zaburzenia.
+- **Λ (struktura danych)** – kontrola jakości: kompletność, brak szumu, stabilność pomiarów.
+- **τ (transformacja zmian)** – charakter zmian: tempo spadku/wzrostu ciśnienia, amplituda temperatury, dynamika wilgotności.
+- **ρ (defekt)** – wykrywanie nagłych skoków: burze, mikro-fronty, lokalne zaburzenia.
 
-## Prognoza 48h
-Prognoza opiera się na:
-- świecach ciśnienia (12h),
-- świecach temperatury (4h),
-- świecach wilgotności (1h),
-- sygnałach TIMDR,
-- warstwach Λ–τ–ρ.
+---
 
-Model nie przewiduje pogody fizycznie —  
-wykrywa kierunek zmian na podstawie sygnałów.
+## 🧠 SYNOPTIC‑F – Model Prognozowania Strukturalnego
 
-## Uruchomienie
+`SYNOPTIC‑F` to rozszerzenie `synoptyk` o rzeczywiste prognozowanie oparte na **figurze zjawiska** (inwariancie strukturalnym).
+
+### Zasada działania
+1. **Kompresja J** – redukcja danych do parametrów rdzenia (średnia, odchylenie standardowe).
+2. **Dekompresja J** – odtworzenie struktury o tej samej długości.
+3. **Filtr Λ–τ–ρ** – wydobycie figury zjawiska (struktury, transformacji, defektu).
+4. **Prognoza** – figura staje się podstawą przewidywania kolejnych wartości.
+
+### Kluczowa reguła
+> **Zasięg prognozy SYNOPTIC‑F jest równy długości okna danych wejściowych.**
+
+| Dane wejściowe | Prognoza |
+|----------------|----------|
+| 7 dni | 7 dni |
+| 14 dni | 14 dni |
+| 30 dni | 30 dni |
+
+### Dlaczego to działa?
+Figura zjawiska jest stabilna – reprezentuje rytm i kształt zmian, a nie chwilową dynamikę. Model przewiduje przyszłość na podstawie struktury wyciągniętej z danych historycznych.
+
+---
+
+## 🚀 Uruchomienie
+
+### Wymagania
+```bash
+pip install -r requirements.txt
+
+Uruchom analizę
+bash
 python3 synoptyk.py
-
-
-Plik CSV musi zawierać:
+Format danych wejściowych (CSV)
+text
 datetime,temp,pressure,humidity,wind_speed,wind_dir,precip
 2026-05-24 12:00,23.1,1012.4,45,3.2,270,0
-
-## Wynik działania
+Wynik działania
 Program wypisuje:
-- Λ – jakość danych,
-- τ – charakter zmian,
-- ρ – defekty,
-- sygnały TIMDR,
-- prognozę 48h.
 
-## Repozytorium
-Kod źródłowy projektu znajduje się tutaj:
+Λ – jakość danych
 
-https://github.com/jbackk-lang/synoptyk
+τ – charakter zmian
 
-## Licencja
-Projekt udostępniany jest na licencji MIT.
+ρ – defekty
 
-Oznacza to:
-- możesz używać kodu w projektach prywatnych i komercyjnych,
-- możesz modyfikować, kopiować i rozpowszechniać,
-- musisz zachować informację o autorze i licencji w kopii kodu.
+sygnały TIMDR
 
-## Uwaga końcowa
-synoptyk jest projektem otwartym i modularnym.  
-Rdzeń (TIMDR + Λ–τ–ρ + świece) jest kompletny i stabilny —  
-wszystko, co powstanie dalej, to już przestrzeń do eksperymentów, modyfikacji i zabawy dla społeczności.
+prognozę SYNOPTIC‑F (48h)
 
-Każdy może:
-- dodawać własne rozszerzenia,
-- tworzyć nowe moduły analizy,
-- poprawiać algorytmy,
-- rozwijać scoring,
-- budować wizualizacje,
-- albo po prostu korzystać z gotowego silnika.
+Uruchom API (opcjonalnie)
+bash
+python -m uvicorn api.main:app --host 0.0.0.0 --port 8000 --reload
+Dokumentacja API: http://localhost:8000/docs
 
-synoptyk nie jest klasycznym modelem numerycznym.  
-To narzędzie do analizy sygnałów pogodowych — lekkie, szybkie i zrozumiałe.  
-Jeśli ktoś chce je rozwijać, droga wolna.  
-Jeśli ktoś chce się nim bawić — jeszcze lepiej.
+📂 Struktura repozytorium
+text
+synoptyk/
+├── analyzer/          # Analiza TIMDR i warstwy Λ–τ–ρ
+├── api/               # FastAPI
+├── config/            # Konfiguracja (config.yaml)
+├── data/              # Pobieranie i cache danych
+├── forecaster/        # SYNOPTIC‑F
+├── scripts/           # Narzędzia (np. update_climatology.py)
+├── synoptyk.py        # Główny skrypt CLI
+├── requirements.txt   # Zależności
+├── run.bat            # Uruchomienie API (Windows)
+└── README.md          # Ten plik
+🔗 Powiązane projekty
+synoptyk jest częścią ekosystemu TIMDR i współdzieli koncepcje z:
 
-# README — SYNOPTIC‑F (Model Prognozowania Strukturalnego)
+TRM-Geometry-Core – geometria skrętu informacji
 
-## Opis modelu
-SYNOPTIC‑F to model rzeczywistego prognozowania opartego na analizie struktury zjawisk atmosferycznych.  
-Model nie zgaduje i nie symuluje — prognozuje na podstawie danych wejściowych, wykorzystując stabilne cechy zjawiska (figurę), wyodrębnione z serii pomiarowej.
+FIELDCORE – struktura pola i rezonansów
 
-Model działa niezależnie od klasycznego synoptyka 48/72 h.  
-SYNOPTIC‑F nie korzysta z dynamiki atmosfery, lecz z inwariantu strukturalnego, który pozostaje stabilny w czasie.
+probabilistic-timdr – rachunek prawdopodobieństwa i warunki brzegowe
 
-## Zasada działania
-Model przetwarza dane w czterech krokach:
+Boundary-Matter – analiza topologiczna i geometryczna
 
-1. Kompresja J — redukcja danych do parametrów opisujących rdzeń zjawiska.  
-2. Dekompresja J — odtworzenie struktury o tej samej długości co dane wejściowe.  
-3. Filtr Λ–τ–ρ — wydobycie figury zjawiska (struktury, transformacji i defektu).  
-4. Prognoza — figura staje się podstawą do przewidywania kolejnych wartości.
-
-## Kluczowa reguła modelu
-**Zasięg prognozy SYNOPTIC‑F jest równy długości okna danych wejściowych.**
-
-Przykłady:  
-- 7 dni danych → 7 dni prognozy  
-- 14 dni danych → 14 dni prognozy  
-- 30 dni danych → 30 dni prognozy  
-
-To jest prognoza, nie projekcja.  
-Model przewiduje przyszłość na podstawie struktury wyciągniętej z danych historycznych.
-
-## Dlaczego to działa
-Figura zjawiska jest stabilna, ponieważ reprezentuje rytm i kształt zmian, a nie ich chwilową dynamikę.  
-Dzięki temu model może prognozować tak daleko, jak daleko sięga analiza danych wejściowych.
-
-## Kod źródłowy
-
-### Kompresja J
-```python
-def j_compress(data):
-    """
-    Kompresja J — rdzeń danych:
-    - średnia
-    - odchylenie standardowe
-    """
-    mean = sum(data) / len(data)
-    variance = sum((x - mean)**2 for x in data) / len(data)
-    std = variance**0.5
-    return mean, std
-
-Copyright (c) 2026 Jacek Kielich
-
-All rights reserved.
-
-This software is proprietary and confidential. 
-No part of this code, documentation, or associated files may be copied, 
-modified, distributed, sold, or used without explicit written permission 
-from the author.
-
-
-Pełna treść licencji MIT:
-
-MIT License
-
-Copyright (c) 2026
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the “Software”), to deal
-in the Software without restriction, including without limitation the rights  
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell  
-copies of the Software, and to permit persons to whom the Software is  
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in  
-all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR  
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE  
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER  
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,  
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN  
-THE SOFTWARE.
