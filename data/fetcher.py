@@ -4,12 +4,12 @@ import pandas as pd
 from datetime import datetime, timedelta
 
 class WeatherFetcher:
-    def __init__(self, lat=50.083, lon=19.917):  # domyślnie Kraków-Balice
+    def __init__(self, lat=50.083, lon=19.917):
         self.lat = lat
         self.lon = lon
         self.base_url = "https://archive-api.open-meteo.com/v1/archive"
     
-    def fetch_hourly(self, start_date: str, end_date: str):
+    def fetch_hourly(self, start_date: str, end_date: str) -> pd.DataFrame:
         """
         Pobiera dane godzinowe z Open-Meteo.
         start_date, end_date: 'YYYY-MM-DD'
@@ -28,7 +28,6 @@ class WeatherFetcher:
         if "hourly" not in data:
             raise ValueError("Błąd pobierania danych: brak klucza 'hourly'")
         
-        # Konwersja do DataFrame
         df = pd.DataFrame({
             "datetime": data["hourly"]["time"],
             "temp": data["hourly"]["temperature_2m"],
@@ -40,7 +39,7 @@ class WeatherFetcher:
         })
         return df
 
-    def fetch_last_n_days(self, n=7):
+    def fetch_last_n_days(self, n=7) -> pd.DataFrame:
         """Pobiera ostatnie n dni (do dzisiaj)."""
         end = datetime.now()
         start = end - timedelta(days=n)
