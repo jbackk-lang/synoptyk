@@ -1,6 +1,7 @@
 # analyzer/timdr_analyzer.py
 import pandas as pd
 from .adaptive_thresholds import AdaptiveThresholds
+from .wind_analyzer import WindAnalyzer
 
 class TIMDRAnalyzer:
     def __init__(self, station="krakow_balice"):
@@ -13,6 +14,12 @@ class TIMDRAnalyzer:
             'rezonans': [],
             'defekt': []
         }
+        
+        # Dodatkowa analiza wiatru
+        wind = WindAnalyzer(df)
+        wind_sudden = wind.sudden_direction_change()
+        if wind_sudden:
+            results['defekt'].append(('wind_dir', 'nagła zmiana kierunku', None))
         
         for idx, row in df.iterrows():
             dt = pd.to_datetime(row['datetime'])
