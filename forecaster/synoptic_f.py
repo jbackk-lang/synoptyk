@@ -37,7 +37,7 @@ class SynopticF:
     
     def _generate_forecast(self, figure, steps):
         """Generuje prognozę na podstawie figury."""
-        mean, std, length = figure['mean'], figure['std'], figure['length']
+        mean, std = figure['mean'], figure['std']
         # Prognoza = dekompresja figury na zadaną liczbę kroków
         return j_decompress(mean, std, steps)
     
