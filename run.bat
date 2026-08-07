@@ -1,27 +1,33 @@
 @echo off
-title SYNOPTYK API Launcher
-echo ========================================
-echo   SYNOPTYK API Launcher
-echo   (c) 2026
-echo ========================================
+chcp 65001 > nul
+title SYNOPTYK-F Launcher
+
+echo ===================================================
+echo   🌀 Uruchamianie SYNOPTYK-F Web Service & API
+echo ===================================================
 echo.
-echo [1/3] Sprawdzanie zaleznosci...
-pip install -r requirements.txt > nul 2>&1
-echo [OK] Zaleznosci zainstalowane.
+
+:: 1. Przejście do katalogu skryptu
+cd /d "%~dp0"
+
+:: 2. Weryfikacja i instalacja wymaganych pakietów przez interpreter Pythona
+echo [1/2] Sprawdzanie i instalacja zależności (FastAPI, Uvicorn, Requests)...
+python -m pip install --quiet --upgrade pip
+python -m pip install --quiet fastapi uvicorn pydantic requests
+
+if %ERRORLEVEL% NEQ 0 (
+    echo.
+    echo ❌ BŁĄD: Nie udało się zainstalować pakietów. Upewnij się, że Python jest dodany do PATH.
+    pause
+    exit /b %ERRORLEVEL%
+)
+
+:: 3. Uruchomienie serwera API i Dashboardu WWW
+echo [2/2] Uruchamianie serwera pod adresem http://localhost:8000 ...
 echo.
-echo [2/3] Uruchamianie API na porcie 8000...
-echo.
-echo ========================================
-echo   API uruchomione!
-echo   Dokumentacja: http://localhost:8000/docs
-echo   Endpointy:
-echo     /health     - status
-echo     /stations   - lista stacji
-echo     /fetch      - pobierz dane
-echo     /analyze    - analiza TIMDR
-echo     /forecast   - prognoza SYNOPTIC-F
-echo     /full       - pelna analiza
-echo ========================================
-echo.
-python -m uvicorn api.main:app --host 0.0.0.0 --port 8000 --reload
+echo Naciśnij CTRL+C, aby zatrzymać serwer.
+echo ---------------------------------------------------
+
+python -m uvicorn main_api:app --host 127.0.0.1 --port 8000 --reload
+
 pause
