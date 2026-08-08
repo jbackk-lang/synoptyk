@@ -96,12 +96,12 @@ przesunięcia: 10–30 km
 stabilność trendu: wysoka
 
 6. Tabela porównawcza
-Parametr	Trend 14 dni	Różnica ECMWF–ICON (Δ)	Stabilność
-Opady	burze + nadmiar na północy	8–20 mm	wysoka
-Temperatura	anomalia +1–3°C	0.4–0.9°C	bardzo wysoka
-Wiatr	zachodni przepływ	1–3 m/s	wysoka
-Fronty	wyż na zachodzie, niże na północy	10–30 km	wysoka
-
+| Parametr | Trend 14 dni | Różnica ECMWF–ICON (Δ) | Stabilność |
+| --- | --- | --- | --- |
+| **Opady** | burze + nadmiar na północy | 8–20 mm | wysoka |
+| **Temperatura** | anomalia +1–3°C | 0.4–0.9°C | bardzo wysoka |
+| **Wiatr** | zachodni przepływ | 1–3 m/s | wysoka |
+| **Fronty** | wyż na zachodzie, niże na północy | 10–30 km | wysoka |
 
 7. Wnioski końcowe
 Dane wsteczne są wystarczające do wygenerowania 14‑dniowego raportu trendowego.
