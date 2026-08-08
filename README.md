@@ -1,190 +1,162 @@
-# 🌀 Synoptyk — analiza pogody oparta o sygnały TIMDR + modele ECMWF/ICON + dane rzeczywiste
+# 🌪️ Synoptyk v2.0
 
-![Python Version](https://img.shields.io/badge/python-3.10%2B-blue)
-![License](https://img.shields.io/badge/license-MIT-green)
+[![Python](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org/)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+[![Dane: Open-Meteo](https://img.shields.io/badge/dane-Open--Meteo-0ea5e9)](https://open-meteo.com/)
 
-Synoptyk pobiera dane pogodowe (Open-Meteo, ECMWF, ICON, pokrycie globalne), wykrywa w nich
-strukturalne sygnały TIMDR (skręt trendu, anomalia, defekt, rezonans) i na tej podstawie liczy
-prognozę krótkoterminową — **deterministyczną, z jawnym pasmem niepewności**, a nie pojedynczą liczbą.
-
-Projekt zawiera **dwa silniki prognozy**, oraz **moduł porównania z danymi rzeczywistymi**:
-
-| | `TIMDRForecast` (`forecaster/`) | `SynoptykFEngine` (`synoptyk_f.py`) | `synoptyk_v2` (modele ECMWF/ICON + dane realne) |
-|---|---|---|---|
-| Dane wejściowe | pełen szereg godzinowy | temperatura + wilgotność | dane rzeczywiste + ECMWF + ICON |
-| Metoda | regresja + sygnały TIMDR | filtr falkowy + korekty UHI | analiza Δ (różnic modeli) + trend |
-| Horyzont | wielodniowy | punktowy | 14 dni (trend) |
-| Wynik | forecast + lower/upper | point + lower/upper | ΔT, ΔPrec, ΔWind + trend |
+Wielodniowa prognoza pogody dla Polski i wybranych regionów USA, oparta na danych Open-Meteo (ECMWF/ICON), z filtrem falkowym Daubechies i opcjonalną analizą sygnałów TIMDR. Wyniki prezentowane są w GUI Gradio — każdy dzień prognozy jako osobny wiersz z temperaturą, ciśnieniem, opadami i wiatrem.
 
 ---
 
-# ⚠️ Stan projektu
+## Co robi
 
-Repo było wielokrotnie naprawiane — usunięto m.in.:
-
-- brakujące importy (`numpy`),
-- błędy w `synoptyk.py`,
-- stary silnik losowy (`random.gauss`), który generował szum.
-
-Domyślny silnik to **TIMDRForecast**, deterministyczny.  
-Stary `SynopticF` pozostaje dla porównania.
-
-Nowo dodany moduł **synoptyk_v2** integruje:
-
-- dane rzeczywiste (Open‑Meteo),
-- ECMWF (IFS),
-- ICON‑EU,
-- porównanie Δ,
-- trend 14‑dniowy.
+- pobiera dane historyczne (Open-Meteo Archive API) i prognozę (Open-Meteo Forecast API) bez lokalnego cache
+- odszumia szereg temperatury filtrem falkowym `db4` (PyWavelets) i stosuje korektę o Miejską Wyspę Ciepła (UHI) oraz gradient termiczny wysokości
+- opcjonalnie wykrywa strukturalne sygnały TIMDR (anomalia / defekt / rezonans) w danych historycznych i poszerza pasmo niepewności prognozy
+- wyświetla prognozę dzienną (1–14 dni) z datami, min/śr/max temperatury, sumą opadów, średnim ciśnieniem i maksymalnym wiatrem
+- ostrzega w dzienniku GUI gdy dane archiwalne są starsze niż 2 doby
 
 ---
 
-# 🌍 Obsługiwane regiony
+## Szybki start
 
-`run_synoptyk.py` obsługuje regiony z jawnie zdefiniowanymi stacjami:
+```bash
+git clone https://github.com/jbackk-lang/synoptyk-v2.0.git
+cd synoptyk-v2.0
+pip install -r requirements.txt
+python gui_app.py
+# GUI dostępne pod http://127.0.0.1:7860
+```
 
-| Region | Stacje |
-|---|---|
-| `malopolska` | Kraków, Tarnów, Zakopane |
-| `poland` | Kraków, Warszawa, Tarnów |
-| `europe` | Berlin, Kraków |
-| `usa` | NYC, Chicago, Denver, Phoenix, LA, Miami, Seattle |
-| `usa_northeast` | NYC, Chicago |
-| `usa_west` | Denver, Phoenix, LA, Seattle |
+> **Windows:** zamiast ostatniej linii uruchom `run.bat`
 
 ---
 
-# 📡 Moduły pobierania danych
+## Wymagania
 
-## Dane rzeczywiste — `data_sources/real_weather.py`
+```
+gradio>=4.0
+numpy
+pandas
+pywavelets
+requests
+```
 
-Pobieranie danych godzinowych z Open‑Meteo Archive API:
+Pełna lista w `requirements.txt`. Nie jest wymagany klucz API — Open-Meteo jest bezpłatne.
 
-- temperatura,
-- opady,
-- wiatr,
-- ciśnienie.
+---
 
-Obsługa wielu regionów:
+## Struktura repo
 
-```python
-REGIONS = {
-    "wieliczka": (49.987, 20.065),
-    "krakow": (50.064, 19.945),
-    "tarnow": (50.012, 20.985),
-    "nowy_sacz": (49.621, 20.697),
-    "zakopane": (49.299, 19.949)
-}
-ECMWF — data_sources/model_ecmwf.py
-Prognozy modelu ECMWF (IFS) z Open‑Meteo.
-
-ICON‑EU — data_sources/model_icon.py
-Prognozy modelu ICON‑EU z Open‑Meteo.
-
-🔍 Porównanie modeli z rzeczywistością — synoptyk/compare.py
-Moduł liczy różnice:
-
-ΔT — temperatura,
-
-ΔPrec — opady,
-
-ΔWind — wiatr,
-
-ΔPressure — ciśnienie.
-
-Wynik: pełna tabela błędów modeli względem danych rzeczywistych.
-
-📈 Trend synoptyk v2 — synoptyk/trend.py
-Trend 14‑dniowy wyliczany z danych rzeczywistych:
-
-średnia temperatura,
-
-średnie opady,
-
-średni wiatr,
-
-średnie ciśnienie.
-
-Trend jest stabilniejszy niż prognozy deterministyczne.
-
-🚀 Integracja — main.py
-Pełny pipeline:
-
-Pobranie danych rzeczywistych.
-
-Pobranie ECMWF i ICON.
-
-Porównanie Δ.
-
-Wyliczenie trendu.
-
-Wypisanie wyników.
-
-Uruchamiane przez:
-
-Kod
-python main.py
-Zgodne z .bat.
-
-📊 Walidacja prognozy
-forecaster/validator.py liczy:
-
-MAE,
-
-RMSE,
-
-zgodność trendu.
-
-Walidacja wymaga:
-
-jasnej metryki,
-
-testu out‑of‑sample,
-
-baseline (persystencja, klimatologia),
-
-dużej próby,
-
-odtwarzalności.
-
-🧪 Wniosek naukowy
-Analiza porównawcza rzeczywistych danych Małopolski z prognozami ECMWF i ICON
-pokazuje systematyczne niedoszacowanie zjawisk ekstremalnych (upały, burze,
-maksima wiatru). Synoptyk v2, oparty na analizie różnic Δ i trendów z danych
-wstecznych, wykazuje większą zgodność z obserwacjami, szczególnie w zakresie
-anomalii temperatury i intensywności opadów. Podejście trendowe stanowi
-wartościowe uzupełnienie klasycznych prognoz numerycznych.
-
-🏗️ Struktura repo
-Kod
-synoptyk/
-├── synoptyk.py
-├── run_synoptyk.py
-├── synoptyk_f.py
-├── grid_engine.py
-├── topomap_data.py
-├── config/config.yaml
+```
+synoptyk-v2.0/
+├── gui_app.py              # główny GUI (Gradio) — wielodniowa prognoza
+├── main.py                 # pipeline CLI: historia → ECMWF/ICON → Δ → trend
+├── main_api.py             # REST API (FastAPI)
+├── run_synoptyk.py         # CLI dla wybranych regionów
+├── synoptyk_f.py           # SynoptykFEngine: filtr falkowy + korekta UHI
+├── grid_engine.py          # siatka przestrzenna (opcjonalna)
+├── topomap_data.py         # baza współrzędnych i metadanych 7 miast PL
+│
 ├── data/
-│   ├── fetcher.py
-│   └── cache.py
+│   ├── fetcher.py          # WeatherFetcher — Open-Meteo Archive
+│   └── cache.py            # SQLite cache (używany tylko przez fetcher.py)
+│
 ├── data_sources/
-│   ├── real_weather.py
-│   ├── model_ecmwf.py
-│   └── model_icon.py
+│   ├── real_weather.py     # dane rzeczywiste godzinowe
+│   ├── model_ecmwf.py      # prognoza ECMWF (IFS)
+│   └── model_icon.py       # prognoza ICON-EU
+│
 ├── analyzer/
-│   ├── timdr_analyzer.py
+│   ├── timdr_analyzer.py   # detekcja sygnałów TIMDR
 │   ├── adaptive_thresholds.py
 │   └── wind_analyzer.py
+│
 ├── synoptyk/
-│   ├── compare.py
-│   └── trend.py
+│   ├── compare.py          # porównanie modeli z rzeczywistością (ΔT, ΔPrec, ΔWind, ΔPressure)
+│   └── trend.py            # trend 14-dniowy
+│
 ├── forecaster/
-│   ├── timdr_forecast.py
+│   ├── timdr_forecast.py   # TIMDRForecast — regresja + sygnały TIMDR
 │   ├── synoptic_f.py
 │   ├── j_compress.py
 │   ├── j_decompress.py
-│   └── validator.py
-└── scripts/
-    └── update_climatology.py
-📝 Licencja
-MIT.
+│   └── validator.py        # MAE, RMSE, zgodność trendu
+│
+├── config/
+│   └── config.yaml
+├── scripts/
+│   └── update_climatology.py
+└── examples/
+```
+
+> `weather_cache.db` — plik SQLite generowany lokalnie przez `data/fetcher.py`. **Nie powinien być commitowany** (dodaj do `.gitignore`). GUI v2 pobiera dane bezpośrednio z API i nie korzysta z cache.
+
+---
+
+## GUI — opis panelu
+
+| Kontrolka | Opis |
+|---|---|
+| Tryb | Cały region lub pojedyncze miasto |
+| Region | `cała_polska`, `poland_south`, `poland_north`, `poland_central`, `poland_west`, `poland_east` |
+| Miasto | Lista ~40 miast PL (dropwdown) |
+| Historia (dni) | Okno danych archiwalnych do filtra falkowego (3–30 dni) |
+| Prognoza (dni) | Liczba dni naprzód w tabeli wyników (1–14) |
+| Tryb Demo | Dane zastępcze „–" gdy brak dostępu do API |
+
+Tabela wyników zawiera kolumny: `Stacja`, `Data`, `Typ` (Dziś/Jutro/+Nd), `Temp min`, `Temp śr`, `Temp max`, `Opady [mm]`, `Ciśnienie [hPa]`, `Wiatr max [km/h]`, `Dane hist. do`.
+
+---
+
+## Obsługiwane regiony (CLI)
+
+| Klucz | Stacje |
+|---|---|
+| `cała_polska` | 14 głównych miast PL |
+| `poland_south` | Kraków, Tarnów, Nowy Sącz, Zakopane, Katowice, Rzeszów, Bielsko-Biała |
+| `poland_north` | Gdańsk, Gdynia, Suwałki, Olsztyn, Elbląg, Koszalin, Szczecin |
+| `poland_central` | Warszawa, Łódź, Radom, Płock, Częstochowa, Kielce |
+| `poland_west` | Poznań, Wrocław, Szczecin, Zielona Góra, Gorzów Wlkp. |
+| `poland_east` | Lublin, Białystok, Zamość, Przemyśl, Siedlce |
+| `usa_northeast` | New York City, Boston, Philadelphia, Baltimore, Hartford |
+| `usa_west` | Los Angeles, San Francisco, Seattle, Portland OR, Las Vegas |
+
+---
+
+## Silniki prognozy
+
+| Silnik | Plik | Dane wejściowe | Metoda | Wynik |
+|---|---|---|---|---|
+| `TIMDRForecast` | `forecaster/timdr_forecast.py` | pełen szereg godzinowy | regresja + sygnały TIMDR | forecast + pasmo [lower, upper] |
+| `SynoptykFEngine` | `synoptyk_f.py` | temperatura + wilgotność | filtr falkowy db4 + korekta UHI | point + pasmo |
+| `synoptyk_v2` | `synoptyk/compare.py` + `trend.py` | dane rzeczywiste + ECMWF + ICON | analiza Δ + trend | ΔT, ΔPrec, ΔWind, ΔPressure |
+
+Domyślny silnik GUI to `SynoptykFEngine` (filtr falkowy) z prognozą z Open-Meteo Forecast API.
+
+---
+
+## Znane ograniczenia
+
+- `topomap_data.py` zawiera pełne metadane tylko dla 7 miast (Warszawa, Kraków, Gdańsk, Wrocław, Poznań, Katowice, Zakopane). Pozostałe miasta używają domyślnych wartości `lat=52.0, lon=19.0` — współrzędne są pobierane z `get_node_metadata()`, które dla nieznanych miast zwraca fallback ze środka Polski.
+- Open-Meteo Archive API ma opóźnienie ~1–2 dni — dane „wczorajsze" mogą być ostatnimi dostępnymi.
+- `forecaster/validator.py` implementuje MAE i RMSE, ale walidacja out-of-sample nie jest uruchamiana automatycznie.
+
+---
+
+## .gitignore (zalecane uzupełnienie)
+
+```gitignore
+weather_cache.db
+data/*.db
+*.db
+__pycache__/
+*.pyc
+.env
+```
+
+---
+
+## Licencja
+
+MIT — szczegóły w pliku [LICENSE](LICENSE).
