@@ -6,6 +6,7 @@ Rozszerzony o prognozę kierunku wiatru.
 
 from .j_compress import j_compress
 from .j_decompress import j_decompress
+import numpy as np
 import pandas as pd
 from datetime import datetime, timedelta
 
