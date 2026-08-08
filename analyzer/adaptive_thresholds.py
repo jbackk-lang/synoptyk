@@ -12,8 +12,14 @@ class AdaptiveThresholds:
     
     def _load_climatology(self):
         df = self.cache.load_climatology(self.station)
+        # Uwaga: nawet gdy dla tej stacji nie ma jeszcze wyliczonej klimatologii,
+        # `df` wciąż ma poprawne nazwy kolumn (pochodzi z zapytania SQL do
+        # istniejącej tabeli) — nie wolno go zastępować "gołym" pd.DataFrame(),
+        # bo ten nie ma żadnych kolumn i set_index(['month','param']) wywali
+        # KeyError: "None of ['month', 'param'] are in the columns".
         if df.empty:
-            return pd.DataFrame().set_index(['month', 'param'])
+            return pd.DataFrame(columns=['station', 'month', 'param', 'mean', 'std', 'p10', 'p90', 'updated_at']) \
+                .set_index(['month', 'param'])
         return df.set_index(['month', 'param'])
     
     def get_thresholds(self, dt: datetime, param: str) -> dict:
