@@ -114,6 +114,22 @@ def run_gui_simulation(mode: str, selected_region: str, selected_city: str, days
             })
         except Exception as e:
             logs.append(f"Błąd przetwarzania miasta {node}: {e}")
+            results.append({
+                "Stacja / Miasto": node,
+                "Szerokość (Lat)": lat,
+                "Długość (Lon)": lon,
+                "Wysokość": f"{meta.get('altitude', 200)}m",
+                "UHI": f"+{meta.get('uhi_factor', 1.0)}°C",
+                "Prognoza": "BŁĄD",
+                "Przedział": "-",
+                "Status TIMDR": str(e)
+            })
+
+    if not results:
+        logs.append(
+            "Brak wyników — wszystkie stacje zakończyły się błędem. "
+            "Sprawdź logi powyżej albo włącz 'Tryb Offline (Demo)', żeby zweryfikować samo GUI."
+        )
 
     return "\n".join(logs), pd.DataFrame(results)
 
