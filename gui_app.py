@@ -2,6 +2,7 @@ import sys
 import os
 import pandas as pd
 import gradio as gr
+from datetime import datetime
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
@@ -121,7 +122,10 @@ def run_gui_simulation(mode: str, selected_region: str, selected_city: str, days
             if show_daily and mode == "Pojedyncze miasto":
                 try:
                     forecaster = TIMDRForecast(figure_window_days=days)
-                    daily = forecaster.predict_daily(df, timdr_results, horizon_days=int(horizon_days))
+                    daily = forecaster.predict_daily(
+                        df, timdr_results, horizon_days=int(horizon_days),
+                        anchor_date=datetime.now()
+                    )
                     temp_daily = daily.get("temp")
                     if temp_daily and temp_daily["dates"]:
                         for d, f, lo, up in zip(
