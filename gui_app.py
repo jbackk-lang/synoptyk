@@ -10,6 +10,7 @@ from synoptyk_f import SynoptykFEngine
 from topomap_data import TOPOGRAPHY_DATABASE, get_node_metadata
 from data.fetcher import WeatherFetcher
 from analyzer.timdr_analyzer import TIMDRAnalyzer
+from forecaster.timdr_forecast import TIMDRForecast
 
 # Mapa regionów
 REGIONS_MAP = {
@@ -49,9 +50,11 @@ def get_coords(node_name: str):
     meta = get_node_metadata(node_name)
     return meta.get("lat", 50.0), meta.get("lon", 20.0)
 
-def run_gui_simulation(mode: str, selected_region: str, selected_city: str, days: int, grid_res: float, offline_demo: bool):
+def run_gui_simulation(mode: str, selected_region: str, selected_city: str, days: int, grid_res: float,
+                        offline_demo: bool, show_daily: bool, horizon_days: int):
     logs = []
     results = []
+    daily_rows = []
 
     if mode == "Pojedyncze miasto":
         nodes = [selected_city]
@@ -112,6 +115,29 @@ def run_gui_simulation(mode: str, selected_region: str, selected_city: str, days
                 "Przedział": f"[{round(res['lower'], 2)} .. {round(res['upper'], 2)}]",
                 "Status TIMDR": res.get('timdr_note', 'OK')
             })
+
+            # Prognoza dzień-po-dniu (osobny silnik: TIMDRForecast, horyzont wielodniowy —
+            # w odróżnieniu od SynoptykFEngine powyżej, który daje tylko punkt + jedno pasmo).
+            if show_daily and mode == "Pojedyncze miasto":
+                try:
+                    forecaster = TIMDRForecast(figure_window_days=days)
+                    daily = forecaster.predict_daily(df, timdr_results, horizon_days=int(horizon_days))
+                    temp_daily = daily.get("temp")
+                    if temp_daily and temp_daily["dates"]:
+                        for d, f, lo, up in zip(
+                            temp_daily["dates"], temp_daily["daily_forecast"],
+                            temp_daily["daily_lower"], temp_daily["daily_upper"]
+                        ):
+                            daily_rows.append({
+                                "Data": str(d),
+                                "Prognoza temp. (°C)": f,
+                                "Przedział": f"[{lo} .. {up}]",
+                                "Korekta TIMDR": temp_daily["timdr_adjustment"]
+                            })
+                    else:
+                        logs.append("Prognoza dzień-po-dniu: brak danych temperatury do ekstrapolacji.")
+                except Exception as e:
+                    logs.append(f"Błąd prognozy dzień-po-dniu dla {node}: {e}")
         except Exception as e:
             logs.append(f"Błąd przetwarzania miasta {node}: {e}")
             results.append({
@@ -125,13 +151,19 @@ def run_gui_simulation(mode: str, selected_region: str, selected_city: str, days
                 "Status TIMDR": str(e)
             })
 
+    if show_daily and mode != "Pojedyncze miasto":
+        logs.append(
+            "Prognoza dzień-po-dniu dostępna tylko w trybie 'Pojedyncze miasto' "
+            "(dla całego regionu tabela byłaby nieczytelna dla wielu stacji naraz)."
+        )
+
     if not results:
         logs.append(
             "Brak wyników — wszystkie stacje zakończyły się błędem. "
             "Sprawdź logi powyżej albo włącz 'Tryb Offline (Demo)', żeby zweryfikować samo GUI."
         )
 
-    return "\n".join(logs), pd.DataFrame(results)
+    return "\n".join(logs), pd.DataFrame(results), pd.DataFrame(daily_rows)
 
 def update_visibility(mode):
     if mode == "Pojedyncze miasto":
@@ -169,11 +201,22 @@ def create_app():
                 days = gr.Slider(minimum=1, maximum=14, value=7, step=1, label="Dni danych (okno)")
                 grid_res = gr.Number(value=0.125, label="Rozdzielczość siatki (°)")
                 offline = gr.Checkbox(value=False, label="Tryb Offline (Demo)")
+                show_daily = gr.Checkbox(
+                    value=True,
+                    label="Pokaż prognozę dzień po dniu (TIMDRForecast)"
+                )
+                horizon_days = gr.Slider(
+                    minimum=1, maximum=7, value=3, step=1,
+                    label="Horyzont prognozy dzień-po-dniu (dni do przodu)"
+                )
                 btn = gr.Button("Uruchom Analizę", variant="primary")
             
             with gr.Column(scale=2):
                 logs = gr.Textbox(label="Dziennik Zdarzeń Silnika", lines=5)
-                table = gr.Dataframe(label="Wyniki Analizy Falkowej & TIMDR")
+                table = gr.Dataframe(label="Wyniki Analizy Falkowej & TIMDR (SynoptykFEngine, punktowo)")
+                daily_table = gr.Dataframe(
+                    label="Prognoza dzień po dniu — temperatura (TIMDRForecast, tylko tryb 'Pojedyncze miasto')"
+                )
 
         mode.change(
             fn=update_visibility,
@@ -183,8 +226,8 @@ def create_app():
 
         btn.click(
             fn=run_gui_simulation,
-            inputs=[mode, region, city, days, grid_res, offline],
-            outputs=[logs, table]
+            inputs=[mode, region, city, days, grid_res, offline, show_daily, horizon_days],
+            outputs=[logs, table, daily_table]
         )
 
     return demo
