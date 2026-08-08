@@ -28,10 +28,23 @@ class SpatialGridEngine:
 
 
 def get_region_bbox(region_name: str) -> Tuple[float, float, float, float]:
-    """Zwraca granice przestrzenne dla wybranego regionu."""
+    """Zwraca granice przestrzenne dla wybranego regionu.
+
+    Rzuca ValueError dla nieznanego regionu zamiast po cichu spadać do
+    Małopolski — wcześniej zapytanie o dowolny nierozpoznany region (np.
+    'ameryka') dawało w wyniku dokładnie tę samą siatkę co dla Krakowa,
+    bez żadnego ostrzeżenia."""
     regions = {
         "malopolska": (49.1, 50.5, 19.0, 21.5),
         "poland": (49.0, 54.8, 14.1, 24.1),
         "europe": (35.0, 71.0, -10.0, 40.0),
+        "usa_northeast": (38.0, 45.0, -80.0, -66.0),
+        "usa_west": (32.0, 49.0, -125.0, -114.0),
+        "usa": (24.5, 49.4, -125.0, -66.9),
     }
-    return regions.get(region_name.lower(), regions["malopolska"])
+    key = region_name.lower()
+    if key not in regions:
+        raise ValueError(
+            f"Nieznany region: {region_name!r}. Dostępne regiony: {sorted(regions)}"
+        )
+    return regions[key]

@@ -5,7 +5,7 @@ from data.fetcher import WeatherFetcher
 from data.cache import WeatherCache
 from analyzer.timdr_analyzer import TIMDRAnalyzer
 from analyzer.wind_analyzer import WindAnalyzer
-from forecaster import SynopticF
+from forecaster import TIMDRForecast
 
 def load_config():
     with open("config/config.yaml", "r", encoding="utf-8") as f:
@@ -26,8 +26,8 @@ def main():
     analyzer = TIMDRAnalyzer(station="krakow_balice")
     timdr_results = analyzer.analyze(df)
     
-    forecaster = SynopticF(figure_window=config['analysis']['figure_window'])
-    forecast = forecaster.predict_daily(df, horizon_days=config['analysis']['forecast_horizon'])
+    forecaster = TIMDRForecast(figure_window_days=config['analysis']['figure_window'])
+    forecast = forecaster.predict_daily(df, timdr_results, horizon_days=config['analysis']['forecast_horizon'])
     
     wind = WindAnalyzer(df)
     avg_dir = wind.average_direction(24)
@@ -61,10 +61,19 @@ def main():
     print(f"   Front: {front['type'] if front['front'] else 'brak'}")
     
     print("\n" + "="*60)
-    print("🌤️ PROGNOZA SYNOPTIC‑F (kolejne 7 dni):\n")
+    print("🌤️ PROGNOZA TIMDR (kolejne dni, z pasmem niepewności):\n")
     for param, data in forecast.items():
         values = data['daily_forecast']
+        lower = data.get('daily_lower', [])
+        upper = data.get('daily_upper', [])
         dates = data['dates']
         if values:
-            print(f"🔹 {param.upper()}:")
-            for i
+            print(f"🔹 {param.upper()} — {data.get('timdr_adjustment', '')}")
+            for i, dt in enumerate(dates):
+                lo = lower[i] if i < len(lower) else None
+                up = upper[i] if i < len(upper) else None
+                band = f" [{lo} .. {up}]" if lo is not None else ""
+                print(f"   {dt}: {values[i]}{band}")
+
+if __name__ == "__main__":
+    main()
