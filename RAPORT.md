@@ -230,3 +230,10 @@ Synoptyk v2 poprawnie wykrył różnice ΔPrec.
 ## 6. Raport gotowy do użycia w README
 
 Ten plik można wkleić bez zmian jako `REPORT.md` lub sekcję dokumentacji synoptyk v2.
+
+🧪 Wniosek w stylu naukowym
+Analiza porównawcza rzeczywistych obserwacji meteorologicznych z ostatnich 14 dni w regionie Małopolski z prognozami modeli numerycznych ECMWF oraz ICON wskazuje na systematyczne niedoszacowanie intensywności zjawisk ekstremalnych przez oba modele. Dotyczy to w szczególności maksymalnych temperatur, sum opadów konwekcyjnych oraz prędkości wiatru. ECMWF charakteryzował się większą stabilnością pola synoptycznego, natomiast ICON lepiej odwzorowywał struktury mezoskalowe, jednak wciąż zaniżał amplitudę zjawisk.
+
+W przeciwieństwie do modeli deterministycznych, synoptyk v2 — oparty na analizie różnic Δ i trendów wyprowadzonych z danych wstecznych — wykazał większą zgodność z obserwacjami, szczególnie w zakresie anomalii temperatury oraz intensywności opadów konwekcyjnych. Sugeruje to, że podejście trendowe, bazujące na stabilności układów barycznych i powtarzalności sygnałów modelowych, może stanowić wartościowe uzupełnienie klasycznych prognoz numerycznych w warunkach zwiększonej zmienności atmosferycznej.
+
+W konsekwencji, wyniki wskazują, że synoptyk v2 posiada wyższą zdolność adaptacyjną do lokalnych odchyleń klimatycznych i może poprawiać interpretację prognoz modeli globalnych oraz regionalnych w kontekście zjawisk ekstremalnych, które są coraz częstsze w warunkach zmieniającego się klimatu.
