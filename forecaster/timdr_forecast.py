@@ -168,10 +168,22 @@ class TIMDRForecast:
         return {"forecast": forecast, "lower": lower, "upper": upper,
                 "slope_per_hour": 0.0, "timdr_adjustment": adj}
 
-    def predict(self, df: pd.DataFrame, timdr_results: dict, horizon_days: int = 3) -> dict:
-        """Prognoza godzinowa dla wszystkich parametrów, zasilona sygnałami TIMDR."""
+    def predict(self, df: pd.DataFrame, timdr_results: dict, horizon_days: int = 3,
+                anchor_date=None) -> dict:
+        """
+        Prognoza godzinowa dla wszystkich parametrów, zasilona sygnałami TIMDR.
+
+        anchor_date: opcjonalna data "od której" liczą się etykiety dat prognozy
+        (np. dzisiejsza data rzeczywista). Jeśli None (domyślnie) — używana jest
+        ostatnia data z `df`, co przy danych z opóźnionego API archiwalnego
+        (patrz data/fetcher.py: lag_days) skutkuje "starymi" datami w prognozie,
+        mimo że same wartości liczbowe wciąż są aktualną ekstrapolacją trendu.
+        """
         steps = horizon_days * 24
-        last_date = pd.to_datetime(df["datetime"].iloc[-1])
+        if anchor_date is not None:
+            last_date = pd.to_datetime(anchor_date)
+        else:
+            last_date = pd.to_datetime(df["datetime"].iloc[-1])
         dates = [last_date + timedelta(hours=i + 1) for i in range(steps)]
 
         results = {}
@@ -188,8 +200,9 @@ class TIMDRForecast:
             results["wind_dir"] = res
         return results
 
-    def predict_daily(self, df: pd.DataFrame, timdr_results: dict, horizon_days: int = 3) -> dict:
-        hourly = self.predict(df, timdr_results, horizon_days)
+    def predict_daily(self, df: pd.DataFrame, timdr_results: dict, horizon_days: int = 3,
+                       anchor_date=None) -> dict:
+        hourly = self.predict(df, timdr_results, horizon_days, anchor_date=anchor_date)
         daily = {}
         for param, data in hourly.items():
             f, lo, up, dates = data["forecast"], data["lower"], data["upper"], data["dates"]
