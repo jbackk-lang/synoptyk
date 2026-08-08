@@ -34,11 +34,6 @@ porównania/historii, ale **nie jest już domyślnie używany**. Domyślny silni
 to `TIMDRForecast`, w pełni deterministyczny (te same dane wejściowe zawsze
 dają ten sam wynik).
 
-**Żadna liczba dokładności (np. "96% zgodności") nie jest obecnie
-zweryfikowana w tym repo.** Sekcja [Walidacja](#-walidacja-i-metodologia)
-niżej opisuje dokładnie, jak to zrobić rzetelnie — i że dopóki tego nie
-zrobisz, żadnego procentu nie da się uczciwie podać.
-
 ## 🚀 Co program faktycznie robi
 
 * **Pobieranie danych** (`data/fetcher.py`) — Open-Meteo Archive API, dowolna
