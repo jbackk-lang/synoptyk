@@ -1,79 +1,57 @@
-import os
-import sys
-from typing import Dict, Any, List, Optional
-from fastapi import FastAPI, HTTPException, Query
-from pydantic import BaseModel
+from fastapi import FastAPI, HTTPException
 
-# Dodanie katalogu głównego do ścieżki systemowej
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from api.regions import REGIONS
+from topomap_data import get_node_metadata
+from data_sources.real_weather import fetch_real_weather
+from data_sources.model_ecmwf import fetch_ecmwf
+from data_sources.model_icon import fetch_icon
+from synoptyk.compare import compare
+from synoptyk.trend import trend
 
-try:
-    from synoptyk_f import SynoptykFEngine
-    from analyzer.timdr_analyzer import TIMDRAnalyzer
-    from data.fetcher import WeatherFetcher
-    from topomap_data import get_node_metadata, NODE_COORDS
-    from grid_engine import SpatialGridEngine, get_region_bbox
-except ImportError as e:
-    print(f"[Ostrzeżenie API] Problem z importem modułów rdzennych: {e}")
+app = FastAPI(title="Synoptyk API v2.0")
 
-app = FastAPI(
-    title="Synoptyk-v2.0 TIMDR Weather API",
-    description="Interfejs API dla prognoz pogodowych zintegrowany z silnikiem TIMDR i odszumianiem falkowym.",
-    version="2.0.0"
-)
 
-class ForecastRequest(BaseModel):
-    region: str = "poland_south"
-    station: str = "Krakow_Centrum"
-    days: int = 7
+@app.get("/api/regions")
+def get_regions():
+    return REGIONS
 
-@app.get("/")
-def read_root():
-    return {
-        "system": "Synoptyk-v2.0",
-        "engine": "TIMDR Wavelet Analyzer",
-        "status": "online"
-    }
 
-@app.get("/api/v1/forecast")
-def get_forecast(
-    station: str = Query("Krakow_Centrum", description="Nazwa węzła pomiarowego"),
-    days: int = Query(7, ge=1, le=14, description="Liczba dni wstecz do analizy")
-):
-    try:
-        if station not in NODE_COORDS:
-            raise HTTPException(status_code=404, detail=f"Nie znaleziono stacji: {station}")
-            
-        lat, lon = NODE_COORDS[station]
+@app.get("/api/forecast")
+def get_forecast(region: str):
+    if region not in REGIONS:
+        raise HTTPException(status_code=404, detail="Nieznany region")
+
+    stations = REGIONS[region]
+
+    # "usa_states" w api/regions.py to słownik {stan: miasto}, nie lista stacji —
+    # rozbijamy go tutaj, żeby endpoint nie wywalał się przy iteracji po kluczach.
+    if isinstance(stations, dict):
+        stations = list(stations.values())
+
+    results = {}
+
+    for station in stations:
+        # SynoptykEngine.resolve_coords(...) nie istniało w repo — współrzędne
+        # bierzemy z tej samej bazy topograficznej, której używa gui_app.py.
         meta = get_node_metadata(station)
+        lat, lon = meta.get("lat", 52.0), meta.get("lon", 19.0)
 
-        # Pobieranie danych pogodowych
-        fetcher = WeatherFetcher(lat=lat, lon=lon)
-        df = fetcher.fetch_last_n_days(days)
+        try:
+            real = fetch_real_weather(lat, lon)
+            ecmwf = fetch_ecmwf(lat, lon)
+            icon = fetch_icon(lat, lon)
 
-        # Analiza TIMDR
-        analyzer = TIMDRAnalyzer(station=station)
-        timdr_results = analyzer.analyze(df)
+            comp_ecmwf = compare(real, ecmwf)
+            comp_icon = compare(real, icon)
+            tr = trend(real)
 
-        # Odszumianie i predykcja falkowa
-        engine = SynoptykFEngine(wavelet="db4")
-        result = engine.predict_temperature_timdr(
-            df,
-            uhi_factor=meta["uhi_factor"],
-            topo_alt=meta["altitude"],
-            timdr_results=timdr_results
-        )
+            results[station] = {
+                "trend": tr,
+                "delta_ecmwf": comp_ecmwf[["ΔT", "ΔPrec", "ΔWind"]].mean().to_dict(),
+                "delta_icon": comp_icon[["ΔT", "ΔPrec", "ΔWind"]].mean().to_dict()
+            }
+        except Exception as e:
+            # Błąd dla jednej stacji nie powinien wywalać całego zapytania /api/forecast.
+            results[station] = {"error": str(e)}
 
-        return {
-            "station": station,
-            "altitude_m": meta["altitude"],
-            "uhi_factor_c": meta["uhi_factor"],
-            "forecast": {
-                "point_temperature": round(result['point'], 2),
-                "lower_bound": round(result['lower'], 2),
-                "upper_bound": round(result['upper'], 2),
-            },
-            "timdr_analysis": result.get('timdr_note', 'Brak szczegółowych wykryć')
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    return results
