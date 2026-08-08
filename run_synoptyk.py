@@ -17,30 +17,180 @@ from data.fetcher import WeatherFetcher
 from analyzer.timdr_analyzer import TIMDRAnalyzer
 
 # Węzły dostępne per region — żeby nie próbować liczyć "Krakow_Center" dla USA
-REGION_NODES = {
-    "malopolska": ["Krakow_Center", "Tarnow", "Zakopane"],
-    "poland": ["Krakow_Center", "Warszawa", "Tarnow"],
-    "europe": ["Berlin", "Krakow_Center"],
-    "usa_northeast": ["New_York_Manhattan", "Chicago"],
-    "usa_west": ["Denver", "Phoenix", "Los_Angeles", "Seattle"],
-    "usa": ["New_York_Manhattan", "Chicago", "Denver", "Phoenix", "Los_Angeles", "Miami", "Seattle"],
-}
+# ============================================
+#  API REGIONÓW — POLSKA + USA (NOWE)
+# ============================================
 
-# Przybliżone lat/lon dla węzłów — do pobrania realnych danych pogodowych
-NODE_COORDS = {
-    "Krakow_Center": (50.06, 19.95),
-    "Krakow_Balice": (50.08, 19.79),
-    "Tarnow": (50.01, 20.99),
-    "Zakopane": (49.30, 19.95),
-    "Warszawa": (52.23, 21.01),
-    "Berlin": (52.52, 13.41),
-    "New_York_Manhattan": (40.78, -73.97),
-    "Chicago": (41.88, -87.63),
-    "Denver": (39.74, -104.99),
-    "Phoenix": (33.45, -112.07),
-    "Los_Angeles": (34.05, -118.24),
-    "Miami": (25.76, -80.19),
-    "Seattle": (47.61, -122.33),
+REGIONS = {
+
+    # ----------------------------------------
+    # 🇵🇱 POLSKA — regiony meteorologiczne
+    # ----------------------------------------
+
+    "poland": [
+        "Warszawa",
+        "Krakow_Centrum",
+        "Gdansk",
+        "Wroclaw",
+        "Poznan",
+        "Szczecin"
+    ],
+
+    "poland_south": [
+        "Krakow_Centrum",
+        "Tarnow",
+        "Nowy_Sacz",
+        "Zakopane",
+        "Katowice",
+        "Rzeszow",
+        "Bielsko_Biala"
+    ],
+
+    "poland_north": [
+        "Gdansk",
+        "Gdynia",
+        "Sopot",
+        "Suwalki",
+        "Olsztyn",
+        "Elblag",
+        "Koszalin"
+    ],
+
+    "poland_central": [
+        "Warszawa",
+        "Lodz",
+        "Radom",
+        "Plock",
+        "Wloclawek",
+        "Czestochowa"
+    ],
+
+    "poland_west": [
+        "Poznan",
+        "Szczecin",
+        "Zielona_Gora",
+        "Gorzow_Wlkp",
+        "Leszno",
+        "Pila"
+    ],
+
+    "poland_east": [
+        "Lublin",
+        "Bialystok",
+        "Zamosc",
+        "Przemysl",
+        "Terespol",
+        "Sandomierz"
+    ],
+
+    # ----------------------------------------
+    # 🇺🇸 USA — pełne API stanów
+    # ----------------------------------------
+
+    "usa_states": {
+        "Alabama": "Birmingham",
+        "Alaska": "Anchorage",
+        "Arizona": "Phoenix",
+        "Arkansas": "Little_Rock",
+        "California": "Los_Angeles",
+        "Colorado": "Denver",
+        "Connecticut": "Hartford",
+        "Delaware": "Wilmington",
+        "Florida": "Miami",
+        "Georgia": "Atlanta",
+        "Hawaii": "Honolulu",
+        "Idaho": "Boise",
+        "Illinois": "Chicago",
+        "Indiana": "Indianapolis",
+        "Iowa": "Des_Moines",
+        "Kansas": "Wichita",
+        "Kentucky": "Louisville",
+        "Louisiana": "New_Orleans",
+        "Maine": "Portland_ME",
+        "Maryland": "Baltimore",
+        "Massachusetts": "Boston",
+        "Michigan": "Detroit",
+        "Minnesota": "Minneapolis",
+        "Mississippi": "Jackson",
+        "Missouri": "St_Louis",
+        "Montana": "Billings",
+        "Nebraska": "Omaha",
+        "Nevada": "Las_Vegas",
+        "New_Hampshire": "Manchester",
+        "New_Jersey": "Newark",
+        "New_Mexico": "Albuquerque",
+        "New_York": "New_York_City",
+        "North_Carolina": "Charlotte",
+        "North_Dakota": "Fargo",
+        "Ohio": "Columbus",
+        "Oklahoma": "Oklahoma_City",
+        "Oregon": "Portland_OR",
+        "Pennsylvania": "Philadelphia",
+        "Rhode_Island": "Providence",
+        "South_Carolina": "Charleston",
+        "South_Dakota": "Sioux_Falls",
+        "Tennessee": "Nashville",
+        "Texas": "Houston",
+        "Utah": "Salt_Lake_City",
+        "Vermont": "Burlington",
+        "Virginia": "Richmond",
+        "Washington": "Seattle",
+        "West_Virginia": "Charleston_WV",
+        "Wisconsin": "Milwaukee",
+        "Wyoming": "Cheyenne"
+    },
+
+    # ----------------------------------------
+    # 🇺🇸 USA — regiony meteorologiczne
+    # ----------------------------------------
+
+    "usa_northeast": [
+        "New_York_City",
+        "Boston",
+        "Philadelphia",
+        "Baltimore",
+        "Hartford"
+    ],
+
+    "usa_southeast": [
+        "Miami",
+        "Atlanta",
+        "Charlotte",
+        "Charleston",
+        "Jacksonville"
+    ],
+
+    "usa_midwest": [
+        "Chicago",
+        "Detroit",
+        "Columbus",
+        "Indianapolis",
+        "Milwaukee"
+    ],
+
+    "usa_south": [
+        "Houston",
+        "Dallas",
+        "Austin",
+        "San_Antonio",
+        "New_Orleans"
+    ],
+
+    "usa_west": [
+        "Los_Angeles",
+        "San_Francisco",
+        "Seattle",
+        "Portland_OR",
+        "Las_Vegas"
+    ],
+
+    "usa_mountains": [
+        "Denver",
+        "Salt_Lake_City",
+        "Boise",
+        "Billings",
+        "Cheyenne"
+    ]
 }
 
 
