@@ -1,31 +1,50 @@
 @echo off
-title SYNOPTYK-F Launcher
+title Synoptyk-v2.0 -- TIMDR Engine (Full Power)
+color 0A
+cls
 
-echo ===================================================
-echo   SYNOPTYK-F Web Service and API Launcher
-echo ===================================================
+echo ============================================================
+echo   SYNOPTYK-v2.0: Uruchamianie w trybie pelnej wydajnosci
+echo ============================================================
 echo.
 
-:: 1. Przejscie do katalogu skryptu
-cd /d "%~dp0"
+:: 1. ZDJECIE LIMITOW SYSTEMOWYCH I WĄTKOWYCH (Win/Python)
+set PYTHONUNBUFFERED=1
+set OMP_NUM_THREADS=%NUMBER_OF_PROCESSORS%
+set MKL_NUM_THREADS=%NUMBER_OF_PROCESSORS%
+set OPENBLAS_NUM_THREADS=%NUMBER_OF_PROCESSORS%
+set VECLIB_MAXIMUM_THREADS=%NUMBER_OF_PROCESSORS%
+set NUMEXPR_NUM_THREADS=%NUMBER_OF_PROCESSORS%
 
-:: 2. Weryfikacja i instalacja zaleznosci
-echo [1/2] Sprawdzanie i instalacja pakietow Python...
-python -m pip install --quiet fastapi uvicorn pydantic requests
-
-if %ERRORLEVEL% NEQ 0 (
-    echo.
-    echo ERROR: Nie udalo sie zainstalowac pakietow. Sprawdz czy Python jest w PATH.
-    pause
-    exit /b %ERRORLEVEL%
+:: 2. SPRAWDZENIE I AKTYWACJA VENV (jesli istnieje)
+if exist "venv\Scripts\activate.bat" (
+    echo [OK] Aktywacja wirtualnego srodowiska (venv)...
+    call venv\Scripts\activate.bat
+) else if exist ".venv\Scripts\activate.bat" (
+    echo [OK] Aktywacja wirtualnego srodowiska (.venv)...
+    call .venv\Scripts\activate.bat
+) else (
+    echo [INFO] Brak wirtualnego srodowiska. Uruchamianie z globalnego Pythona.
 )
 
-:: 3. Uruchomienie serwera API i Dashboardu WWW
-echo [2/2] Uruchamianie serwera pod adresem http://127.0.0.1:8000 ...
+echo [OK] Alokacja watkow procesora: %NUMBER_OF_PROCESSORS% watkow.
 echo.
-echo Nacisnij CTRL+C, aby zatrzymac serwer.
-echo ---------------------------------------------------
 
-python -m uvicorn main_api:app --host 127.0.0.1 --port 8000 --reload
+:: 3. URUCHOMIENIE APLIKACJI GUI
+if exist "gui_app.py" (
+    echo Uruchamianie gui_app.py...
+    python gui_app.py
+) else if exist "synoptyk.py" (
+    echo Uruchamianie synoptyk.py...
+    python synoptyk.py
+) else (
+    echo [BŁĄD] Nie znaleziono pliku gui_app.py ani synoptyk.py!
+    pause
+    exit /b 1
+)
 
+echo.
+echo ============================================================
+echo   Sesja zostala zakonczona.
+echo ============================================================
 pause
