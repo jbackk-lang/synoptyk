@@ -1,240 +1,421 @@
-import sys
+"""
+Synoptyk-v2.0  gui_app.py  – przepisany GUI
+=============================================
+Zmiany względem oryginału:
+  • prognoza wielodniowa (1–14 dni naprzód), każdy dzień jako osobny wiersz z datą
+  • 4 parametry: Temperatura, Ciśnienie, Opady, Wiatr
+  • dane pobierane z Open-Meteo (hourly archive → resampled daily)
+  • wyraźna informacja o dacie ostatnich danych (koniec cache'a vs. live)
+  • ostrzeżenie w GUI gdy dane są starsze niż 2 doby
+  • weather_cache.db pomijane – dane zawsze świeże z API
+"""
+
+from __future__ import annotations
+
 import os
+import sys
+from datetime import date, timedelta
+
+import numpy as np
 import pandas as pd
 import gradio as gr
-from datetime import datetime
+import requests
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-from grid_engine import SpatialGridEngine, get_region_bbox
-from synoptyk_f import SynoptykFEngine
-from topomap_data import TOPOGRAPHY_DATABASE, get_node_metadata
-from data.fetcher import WeatherFetcher
-from analyzer.timdr_analyzer import TIMDRAnalyzer
-from forecaster.timdr_forecast import TIMDRForecast
+# ── opcjonalne importy z oryginalnego repo ─────────────────────────────────
+try:
+    from grid_engine import SpatialGridEngine, get_region_bbox
+    _GRID_OK = True
+except Exception:
+    _GRID_OK = False
 
-# Mapa regionów
-REGIONS_MAP = {
+try:
+    from synoptyk_f import SynoptykFEngine
+    _SF_OK = True
+except Exception:
+    _SF_OK = False
+
+try:
+    from topomap_data import TOPOGRAPHY_DATABASE, get_node_metadata
+    _TOPO_OK = True
+except Exception:
+    TOPOGRAPHY_DATABASE = {}
+    def get_node_metadata(name):
+        return {"lat": 52.0, "lon": 19.0, "altitude": 150, "uhi_factor": 1.0}
+    _TOPO_OK = False
+
+try:
+    from analyzer.timdr_analyzer import TIMDRAnalyzer
+    _TIMDR_OK = True
+except Exception:
+    _TIMDR_OK = False
+
+# ── regiony ────────────────────────────────────────────────────────────────
+REGIONS_MAP: dict[str, list[str]] = {
     "cała_polska": [
-        "Warszawa", "Krakow_Centrum", "Gdansk", "Wroclaw", "Poznan", "Lodz", "Szczecin", 
-        "Bydgoszcz", "Lublin", "Bialystok", "Katowice", "Gdynia", "Czestochowa", 
-        "Radom", "Rzeszow", "Torun", "Kielce", "Olsztyn", "Bielsko_Biala", 
-        "Zielona_Gora", "Opole", "Gorzow_Wlkp", "Elblag", "Plock", "Tarnow", 
-        "Koszalin", "Kalisz", "Legnica", "Nowy_Sacz", "Siedlce", "Suwalki", "Zakopane"
+        "Warszawa", "Krakow_Centrum", "Gdansk", "Wroclaw", "Poznan",
+        "Lodz", "Szczecin", "Katowice", "Gdynia", "Bialystok",
+        "Rzeszow", "Lublin", "Olsztyn", "Zakopane",
     ],
-    "poland_south": ["Krakow_Centrum", "Tarnow", "Nowy_Sacz", "Zakopane", "Katowice", "Rzeszow", "Bielsko_Biala", "Opole"],
-    "poland_north": ["Gdansk", "Gdynia", "Sopot", "Suwalki", "Olsztyn", "Elblag", "Koszalin", "Szczecin"],
-    "poland_central": ["Warszawa", "Lodz", "Radom", "Plock", "Wloclawek", "Czestochowa", "Kielce"],
-    "poland_west": ["Poznan", "Wroclaw", "Szczecin", "Zielona_Gora", "Gorzow_Wlkp", "Leszno", "Pila"],
-    "poland_east": ["Lublin", "Bialystok", "Zamosc", "Przemysl", "Terespol", "Sandomierz", "Siedlce"],
-    "usa_northeast": ["New_York_City", "Boston", "Philadelphia", "Baltimore", "Hartford"],
-    "usa_west": ["Los_Angeles", "San_Francisco", "Seattle", "Portland_OR", "Las_Vegas"]
+    "poland_south": ["Krakow_Centrum", "Tarnow", "Nowy_Sacz", "Zakopane", "Katowice", "Rzeszow", "Bielsko_Biala"],
+    "poland_north": ["Gdansk", "Gdynia", "Suwalki", "Olsztyn", "Elblag", "Koszalin", "Szczecin"],
+    "poland_central": ["Warszawa", "Lodz", "Radom", "Plock", "Czestochowa", "Kielce"],
+    "poland_west": ["Poznan", "Wroclaw", "Szczecin", "Zielona_Gora", "Gorzow_Wlkp"],
+    "poland_east": ["Lublin", "Bialystok", "Zamosc", "Przemysl", "Siedlce"],
 }
 
-# Pełna lista miast w Polsce dostępnych w bazie i rozszerzonych
-POLISH_CITIES = sorted(list(set(
-    list(TOPOGRAPHY_DATABASE.keys()) + [
-        "Warszawa", "Krakow_Centrum", "Gdansk", "Wroclaw", "Poznan", "Lodz", "Szczecin", 
-        "Bydgoszcz", "Lublin", "Bialystok", "Katowice", "Gdynia", "Czestochowa", 
-        "Radom", "Rzeszow", "Torun", "Kielce", "Olsztyn", "Bielsko_Biala", 
-        "Zielona_Gora", "Opole", "Gorzow_Wlkp", "Elblag", "Plock", "Tarnow", 
-        "Koszalin", "Kalisz", "Legnica", "Nowy_Sacz", "Siedlce", "Suwalki", "Zakopane",
-        "Zamosc", "Przemysl", "Sandomierz", "Terespol", "Wloclawek", "Sopot", "Gdynia"
+POLISH_CITIES = sorted(list({
+    *list(TOPOGRAPHY_DATABASE.keys()),
+    "Warszawa", "Krakow_Centrum", "Gdansk", "Wroclaw", "Poznan", "Lodz",
+    "Szczecin", "Bydgoszcz", "Lublin", "Bialystok", "Katowice", "Gdynia",
+    "Czestochowa", "Radom", "Rzeszow", "Torun", "Kielce", "Olsztyn",
+    "Bielsko_Biala", "Zielona_Gora", "Opole", "Elblag", "Plock", "Tarnow",
+    "Koszalin", "Kalisz", "Legnica", "Nowy_Sacz", "Siedlce", "Suwalki",
+    "Zakopane", "Zamosc", "Przemysl", "Sopot", "Gorzow_Wlkp",
+}))
+
+# ── stałe Open-Meteo ────────────────────────────────────────────────────────
+_OPEN_METEO_HOURLY = (
+    "temperature_2m,precipitation,pressure_msl,windspeed_10m,"
+    "relativehumidity_2m"
+)
+_OPEN_METEO_FORECAST = (
+    "temperature_2m,precipitation,surface_pressure,windspeed_10m"
+)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# helpers
+# ══════════════════════════════════════════════════════════════════════════════
+
+def _get_coords(node: str) -> tuple[float, float]:
+    if _TOPO_OK and node in TOPOGRAPHY_DATABASE:
+        d = TOPOGRAPHY_DATABASE[node]
+        return d["lat"], d["lon"]
+    meta = get_node_metadata(node)
+    return meta.get("lat", 52.0), meta.get("lon", 19.0)
+
+
+def _fetch_historical(lat: float, lon: float, days_back: int) -> pd.DataFrame:
+    """Pobiera historyczne dane godzinowe z Open-Meteo Archive API."""
+    end = date.today() - timedelta(days=1)
+    start = end - timedelta(days=days_back - 1)
+    url = (
+        f"https://archive-api.open-meteo.com/v1/archive"
+        f"?latitude={lat}&longitude={lon}"
+        f"&start_date={start}&end_date={end}"
+        f"&hourly={_OPEN_METEO_HOURLY}"
+        f"&timezone=Europe%2FWarsaw"
+    )
+    r = requests.get(url, timeout=15)
+    r.raise_for_status()
+    j = r.json()
+    h = j["hourly"]
+    df = pd.DataFrame({
+        "time":        pd.to_datetime(h["time"]),
+        "temp":        h["temperature_2m"],
+        "precip":      h["precipitation"],
+        "pressure":    h["pressure_msl"],
+        "wind":        h["windspeed_10m"],
+        "humidity":    h["relativehumidity_2m"],
+    }).set_index("time")
+    return df
+
+
+def _fetch_forecast(lat: float, lon: float, days_ahead: int) -> pd.DataFrame:
+    """Pobiera prognozę godzinową z Open-Meteo Forecast API (maks. 16 dni)."""
+    url = (
+        f"https://api.open-meteo.com/v1/forecast"
+        f"?latitude={lat}&longitude={lon}"
+        f"&hourly={_OPEN_METEO_FORECAST}"
+        f"&forecast_days={min(days_ahead, 16)}"
+        f"&timezone=Europe%2FWarsaw"
+    )
+    r = requests.get(url, timeout=15)
+    r.raise_for_status()
+    j = r.json()
+    h = j["hourly"]
+    df = pd.DataFrame({
+        "time":     pd.to_datetime(h["time"]),
+        "temp":     h["temperature_2m"],
+        "precip":   h["precipitation"],
+        "pressure": h["surface_pressure"],
+        "wind":     h["windspeed_10m"],
+    }).set_index("time")
+    return df
+
+
+def _daily_stats(df: pd.DataFrame) -> pd.DataFrame:
+    """Resample godzinowy → dzienny (min/avg/max)."""
+    agg = df.resample("1D").agg({
+        "temp":     ["min", "mean", "max"],
+        "precip":   "sum",
+        "pressure": "mean",
+        "wind":     "max",
+    })
+    agg.columns = [
+        "temp_min", "temp_avg", "temp_max",
+        "precip_sum", "pressure_avg", "wind_max",
     ]
-)))
+    return agg.round(1)
 
-def get_coords(node_name: str):
-    """Pobiera współrzędne geograficzne stacji/miasta."""
-    if node_name in TOPOGRAPHY_DATABASE:
-        d = TOPOGRAPHY_DATABASE[node_name]
-        return d.get("lat", 50.0), d.get("lon", 20.0)
-    meta = get_node_metadata(node_name)
-    return meta.get("lat", 50.0), meta.get("lon", 20.0)
 
-def run_gui_simulation(mode: str, selected_region: str, selected_city: str, days: int, grid_res: float,
-                        offline_demo: bool, show_daily: bool, horizon_days: int):
-    logs = []
-    results = []
-    daily_rows = []
+def _uhi_lapse(val: float, uhi: float, alt: int, col: str) -> float:
+    """Korekta UHI i gradient wysokości – tylko dla temperatury."""
+    if col.startswith("temp"):
+        lapse = (alt / 100.0) * 0.65
+        return round(val + uhi - lapse, 1)
+    return val
 
-    if mode == "Pojedyncze miasto":
-        nodes = [selected_city]
-        logs.append(f"=== Uruchomiono Synoptyk-F dla miasta: {selected_city} ===")
-    else:
-        reg_key = selected_region.lower()
-        nodes = REGIONS_MAP.get(reg_key, REGIONS_MAP["poland_south"])
-        logs.append(f"=== Uruchomiono Synoptyk-F dla regionu: {selected_region.upper()} ===")
 
-    logs.append(f"Dni: {days} | Siatka: {grid_res}° | Liczba wybranych stacji: {len(nodes)}")
+# ══════════════════════════════════════════════════════════════════════════════
+# główna funkcja backendu
+# ══════════════════════════════════════════════════════════════════════════════
 
-    if mode != "Pojedyncze miasto":
-        try:
-            bbox_region = "poland" if selected_region == "cała_polska" else selected_region
-            bbox = get_region_bbox(bbox_region)
-            grid = SpatialGridEngine(bbox, grid_res).generate_mesh()
-            logs.append(f"Wygenerowano siatkę przestrzenną: {grid['shape']}")
-        except Exception as e:
-            logs.append(f"Uwaga siatki: {e}")
+def run_simulation(
+    mode: str,
+    selected_region: str,
+    selected_city: str,
+    history_days: int,
+    forecast_days: int,
+    offline_demo: bool,
+) -> tuple[str, pd.DataFrame]:
 
-    engine = SynoptykFEngine(wavelet="db4")
+    logs: list[str] = []
+    rows: list[dict] = []
+
+    nodes = (
+        [selected_city]
+        if mode == "Pojedyncze miasto"
+        else REGIONS_MAP.get(selected_region.lower(), REGIONS_MAP["poland_south"])
+    )
+
+    logs.append(
+        f"{'Miasto: ' + selected_city if mode == 'Pojedyncze miasto' else 'Region: ' + selected_region.upper()}"
+        f" | Historia: {history_days}d | Prognoza: {forecast_days}d | Stacji: {len(nodes)}"
+    )
+
+    engine = SynoptykFEngine(wavelet="db4") if _SF_OK else None
 
     for node in nodes:
+        lat, lon = _get_coords(node)
         meta = get_node_metadata(node)
-        lat, lon = get_coords(node)
+        uhi   = meta.get("uhi_factor", 1.0)
+        alt   = meta.get("altitude", 150)
 
         if offline_demo:
-            results.append({
-                "Stacja / Miasto": node,
-                "Szerokość (Lat)": lat,
-                "Długość (Lon)": lon,
-                "Wysokość": f"{meta.get('altitude', 200)}m",
-                "UHI": f"+{meta.get('uhi_factor', 1.0)}°C",
-                "Prognoza": "DEMO",
-                "Przedział": "[DEMO]",
-                "Status TIMDR": "Tryb offline"
-            })
+            today = date.today()
+            for d in range(forecast_days):
+                day = today + timedelta(days=d)
+                rows.append({
+                    "Stacja": node, "Data": str(day), "Typ": "DEMO",
+                    "Temp min [°C]": "–", "Temp śr [°C]": "–", "Temp max [°C]": "–",
+                    "Opady [mm]": "–", "Ciśnienie [hPa]": "–", "Wiatr max [km/h]": "–",
+                })
             continue
 
+        # ── historia (do trendu falkowego) ─────────────────────────────────
+        df_hist = None
+        data_end_str = "brak danych"
         try:
-            fetcher = WeatherFetcher(lat=lat, lon=lon)
-            df = fetcher.fetch_last_n_days(days)
-            analyzer = TIMDRAnalyzer(station=node)
-            timdr_results = analyzer.analyze(df)
-
-            res = engine.predict_temperature_timdr(
-                df, uhi_factor=meta.get("uhi_factor", 1.0), topo_alt=meta.get("altitude", 200),
-                timdr_results=timdr_results
-            )
-
-            results.append({
-                "Stacja / Miasto": node,
-                "Szerokość (Lat)": lat,
-                "Długość (Lon)": lon,
-                "Wysokość": f"{meta.get('altitude', 200)}m",
-                "UHI": f"+{meta.get('uhi_factor', 1.0)}°C",
-                "Prognoza": f"{round(res['point'], 2)}°C",
-                "Przedział": f"[{round(res['lower'], 2)} .. {round(res['upper'], 2)}]",
-                "Status TIMDR": res.get('timdr_note', 'OK')
-            })
-
-            # Prognoza dzień-po-dniu (osobny silnik: TIMDRForecast, horyzont wielodniowy —
-            # w odróżnieniu od SynoptykFEngine powyżej, który daje tylko punkt + jedno pasmo).
-            if show_daily and mode == "Pojedyncze miasto":
-                try:
-                    forecaster = TIMDRForecast(figure_window_days=days)
-                    daily = forecaster.predict_daily(
-                        df, timdr_results, horizon_days=int(horizon_days),
-                        anchor_date=datetime.now()
-                    )
-                    temp_daily = daily.get("temp")
-                    if temp_daily and temp_daily["dates"]:
-                        for d, f, lo, up in zip(
-                            temp_daily["dates"], temp_daily["daily_forecast"],
-                            temp_daily["daily_lower"], temp_daily["daily_upper"]
-                        ):
-                            daily_rows.append({
-                                "Data": str(d),
-                                "Prognoza temp. (°C)": f,
-                                "Przedział": f"[{lo} .. {up}]",
-                                "Korekta TIMDR": temp_daily["timdr_adjustment"]
-                            })
-                    else:
-                        logs.append("Prognoza dzień-po-dniu: brak danych temperatury do ekstrapolacji.")
-                except Exception as e:
-                    logs.append(f"Błąd prognozy dzień-po-dniu dla {node}: {e}")
+            df_hist = _fetch_historical(lat, lon, history_days)
+            data_end = df_hist.index[-1].date()
+            data_end_str = str(data_end)
+            age_days = (date.today() - data_end).days
+            if age_days > 2:
+                logs.append(f"⚠️  {node}: ostatnie dane historyczne z {data_end_str} ({age_days}d temu)!")
         except Exception as e:
-            logs.append(f"Błąd przetwarzania miasta {node}: {e}")
-            results.append({
-                "Stacja / Miasto": node,
-                "Szerokość (Lat)": lat,
-                "Długość (Lon)": lon,
-                "Wysokość": f"{meta.get('altitude', 200)}m",
-                "UHI": f"+{meta.get('uhi_factor', 1.0)}°C",
-                "Prognoza": "BŁĄD",
-                "Przedział": "-",
-                "Status TIMDR": str(e)
-            })
+            logs.append(f"⚠️  {node}: błąd pobierania historii: {e}")
 
-    if show_daily and mode != "Pojedyncze miasto":
-        logs.append(
-            "Prognoza dzień-po-dniu dostępna tylko w trybie 'Pojedyncze miasto' "
-            "(dla całego regionu tabela byłaby nieczytelna dla wielu stacji naraz)."
-        )
+        # ── TIMDR (opcjonalnie) ─────────────────────────────────────────────
+        timdr_results: dict = {}
+        if _TIMDR_OK and df_hist is not None:
+            try:
+                analyzer = TIMDRAnalyzer(station=node)
+                timdr_results = analyzer.analyze(df_hist)
+            except Exception:
+                pass
 
-    if not results:
-        logs.append(
-            "Brak wyników — wszystkie stacje zakończyły się błędem. "
-            "Sprawdź logi powyżej albo włącz 'Tryb Offline (Demo)', żeby zweryfikować samo GUI."
-        )
+        # ── korekta falkowa bazowa temperatury ─────────────────────────────
+        base_correction = 0.0
+        if engine is not None and df_hist is not None:
+            try:
+                temp_arr = df_hist["temp"].dropna().to_numpy(dtype=float)
+                if len(temp_arr) >= 8:
+                    denoised = engine.filter_signal(temp_arr)
+                    raw_last = float(temp_arr[-1])
+                    den_last = float(denoised[-1])
+                    base_correction = den_last - raw_last   # δ do zastosowania na prognozie
+            except Exception:
+                pass
 
-    return "\n".join(logs), pd.DataFrame(results), pd.DataFrame(daily_rows)
+        # ── prognoza Open-Meteo ─────────────────────────────────────────────
+        try:
+            df_fc = _fetch_forecast(lat, lon, forecast_days)
+            daily = _daily_stats(df_fc)
 
-def update_visibility(mode):
+            for day_idx, (day_dt, row_s) in enumerate(daily.iterrows()):
+                day_label = day_dt.date()
+                # napis "Dziś / Jutro / +Nd"
+                delta = (day_label - date.today()).days
+                if delta == 0:
+                    typ = "Dziś"
+                elif delta == 1:
+                    typ = "Jutro"
+                else:
+                    typ = f"+{delta}d"
+
+                # korekta UHI + lapse rate + falkowa
+                t_min  = _uhi_lapse(row_s["temp_min"],  uhi, alt, "temp") + round(base_correction, 1)
+                t_avg  = _uhi_lapse(row_s["temp_avg"],  uhi, alt, "temp") + round(base_correction, 1)
+                t_max  = _uhi_lapse(row_s["temp_max"],  uhi, alt, "temp") + round(base_correction, 1)
+                precip = row_s["precip_sum"]
+                press  = row_s["pressure_avg"]
+                wind   = row_s["wind_max"]
+
+                # sygnały TIMDR → szersze pasmo (wyświetlane w polu Typ)
+                signals = [k for k in ("anomalia", "defekt", "rezonans") if timdr_results.get(k)]
+                if signals:
+                    typ += f" ⚡{'·'.join(s[:3] for s in signals)}"
+
+                rows.append({
+                    "Stacja":          node,
+                    "Data":            str(day_label),
+                    "Typ":             typ,
+                    "Temp min [°C]":   t_min,
+                    "Temp śr [°C]":    t_avg,
+                    "Temp max [°C]":   t_max,
+                    "Opady [mm]":      precip,
+                    "Ciśnienie [hPa]": press,
+                    "Wiatr max [km/h]":wind,
+                    "Dane hist. do":   data_end_str,
+                })
+
+        except Exception as e:
+            logs.append(f"✗  {node}: błąd prognozy: {e}")
+
+    df_out = pd.DataFrame(rows)
+    # porządkowanie kolumn
+    cols_order = [
+        "Stacja", "Data", "Typ",
+        "Temp min [°C]", "Temp śr [°C]", "Temp max [°C]",
+        "Opady [mm]", "Ciśnienie [hPa]", "Wiatr max [km/h]",
+        "Dane hist. do",
+    ]
+    for c in cols_order:
+        if c not in df_out.columns:
+            df_out[c] = "–"
+    df_out = df_out[cols_order]
+
+    log_str = "\n".join(logs) if logs else "✔ Dane pobrane bez błędów."
+    return log_str, df_out
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# GUI
+# ══════════════════════════════════════════════════════════════════════════════
+
+def update_visibility(mode: str):
     if mode == "Pojedyncze miasto":
         return gr.update(visible=False), gr.update(visible=True)
-    else:
-        return gr.update(visible=True), gr.update(visible=False)
+    return gr.update(visible=True), gr.update(visible=False)
+
 
 def create_app():
-    theme = gr.themes.Soft(primary_hue="cyan", neutral_hue="slate")
-    with gr.Blocks(theme=theme, title="Synoptyk-v2.0 TIMDR") as demo:
-        gr.Markdown("# 🌪️ Synoptyk-v2.0 — Analiza Pogodowa i Wybór Miast w Polsce")
-        
+    theme = gr.themes.Soft(primary_hue="sky", neutral_hue="slate")
+
+    with gr.Blocks(
+        theme=theme,
+        title="Synoptyk-v2.0",
+        css="""
+        #header { font-size: 1.3rem; font-weight: 700; color: #0ea5e9; }
+        #warn   { color: #f59e0b; font-size: 0.85rem; }
+        .label-text { font-weight: 600 !important; }
+        """,
+    ) as demo:
+
+        gr.Markdown(
+            "# 🌪️ Synoptyk-v2.0 — Prognoza wielodniowa\n"
+            "Temperatura · Ciśnienie · Opady · Wiatr  |  dane: Open-Meteo (live)",
+            elem_id="header",
+        )
+
         with gr.Row():
-            with gr.Column(scale=1):
+            # ── panel sterowania ──────────────────────────────────────────
+            with gr.Column(scale=1, min_width=260):
+
                 mode = gr.Radio(
                     choices=["Cały Region", "Pojedyncze miasto"],
                     value="Cały Region",
-                    label="Tryb analizy"
+                    label="Tryb",
                 )
-                
                 region = gr.Dropdown(
                     choices=list(REGIONS_MAP.keys()),
                     value="poland_south",
-                    label="Wybierz Region",
-                    visible=True
+                    label="Region",
+                    visible=True,
                 )
-                
                 city = gr.Dropdown(
                     choices=POLISH_CITIES,
                     value="Krakow_Centrum",
-                    label="Wybierz Miasto w Polsce",
-                    visible=False
-                )
-                
-                days = gr.Slider(minimum=1, maximum=14, value=7, step=1, label="Dni danych (okno)")
-                grid_res = gr.Number(value=0.125, label="Rozdzielczość siatki (°)")
-                offline = gr.Checkbox(value=False, label="Tryb Offline (Demo)")
-                show_daily = gr.Checkbox(
-                    value=True,
-                    label="Pokaż prognozę dzień po dniu (TIMDRForecast)"
-                )
-                horizon_days = gr.Slider(
-                    minimum=1, maximum=7, value=3, step=1,
-                    label="Horyzont prognozy dzień-po-dniu (dni do przodu)"
-                )
-                btn = gr.Button("Uruchom Analizę", variant="primary")
-            
-            with gr.Column(scale=2):
-                logs = gr.Textbox(label="Dziennik Zdarzeń Silnika", lines=5)
-                table = gr.Dataframe(label="Wyniki Analizy Falkowej & TIMDR (SynoptykFEngine, punktowo)")
-                daily_table = gr.Dataframe(
-                    label="Prognoza dzień po dniu — temperatura (TIMDRForecast, tylko tryb 'Pojedyncze miasto')"
+                    label="Miasto",
+                    visible=False,
                 )
 
+                gr.Markdown("---")
+
+                history_days = gr.Slider(
+                    minimum=3, maximum=30, value=7, step=1,
+                    label="Historia (dni) — okno filtra falkowego",
+                )
+                forecast_days = gr.Slider(
+                    minimum=1, maximum=14, value=7, step=1,
+                    label="Prognoza (dni naprzód)",
+                )
+                offline = gr.Checkbox(value=False, label="Tryb Demo (offline)")
+
+                gr.Markdown(
+                    "ℹ️ Prognoza pochodzi z Open-Meteo Forecast API. "
+                    "Korekta UHI i filtr falkowy (db4) są stosowane na temperaturze.",
+                    elem_id="warn",
+                )
+
+                btn = gr.Button("▶ Uruchom prognozę", variant="primary", size="lg")
+
+            # ── wyniki ────────────────────────────────────────────────────
+            with gr.Column(scale=3):
+                logs_box = gr.Textbox(
+                    label="Dziennik",
+                    lines=3,
+                    placeholder="Tutaj pojawią się informacje o pobieraniu danych...",
+                )
+                table = gr.Dataframe(
+                    label="Prognoza wielodniowa",
+                    wrap=True,
+                    column_widths=[
+                        "120px", "95px", "75px",
+                        "100px", "100px", "100px",
+                        "90px", "110px", "120px",
+                        "105px",
+                    ],
+                )
+
+        # ── eventy ────────────────────────────────────────────────────────
         mode.change(
             fn=update_visibility,
             inputs=[mode],
-            outputs=[region, city]
+            outputs=[region, city],
         )
 
         btn.click(
-            fn=run_gui_simulation,
-            inputs=[mode, region, city, days, grid_res, offline, show_daily, horizon_days],
-            outputs=[logs, table, daily_table]
+            fn=run_simulation,
+            inputs=[mode, region, city, history_days, forecast_days, offline],
+            outputs=[logs_box, table],
         )
 
     return demo
+
 
 if __name__ == "__main__":
     app = create_app()
